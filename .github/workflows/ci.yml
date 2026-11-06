@@ -1,0 +1,49 @@
+# .github/workflows/ci.yml
+#
+# Continuous Integration pipeline for CPEELEC2L Lab 08.
+# Runs on every push / PR to feature/deployment-ci and main.
+#
+# Steps: checkout → Node.js setup → install → test
+# No real database is needed: Prisma is mocked inside tests/.
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - feature/deployment-ci
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Install & Test (Node 20)
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out the repository at the commit that triggered the workflow
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up the exact Node.js version used in development
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"          # speeds up installs by caching node_modules
+
+      # 3. Clean, reproducible install (uses package-lock.json; fails on drift)
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Run the Jest suite — no database required (Prisma is mocked)
+      - name: Run tests
+        run: npm test
+        env:
+          # Provide a dummy DATABASE_URL so dotenv/prisma don't error on load.
+          # The real value is never committed; mocks replace all DB calls.
+          DATABASE_URL: "mysql://ci:ci@localhost:3306/ci_dummy"
+          DATABASE_SSL: "false"
+          NODE_ENV: test

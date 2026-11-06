@@ -1,0 +1,42 @@
+{
+  "name": "cpeelec2l_lab05_orm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "build": "cd client && npm install && npm run build",
+    "migrate": "prisma migrate deploy",
+    "test": "jest --forceExit",
+    "postinstall": "prisma generate || exit 0",
+    "seed": "node prisma/seed.cjs",
+    "crud": "node src/crud.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "prisma": "^7.10.0",
+    "supertest": "^7.3.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "setupFiles": [
+      "<rootDir>/tests/setup.js"
+    ]
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.3.0",
+    "mariadb": "^3.5.4"
+  }
+}
