@@ -7,6 +7,7 @@ const prisma = require("./prisma");
 const authRoutes = require("./authRoutes");
 
 const app = express();
+app.disable("x-powered-by");
 const PORT = process.env.PORT || 5000;
 const COMMIT_SHA =
   process.env.GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || "local";
@@ -41,7 +42,7 @@ app.use(
 );
 
 // Parse incoming JSON request bodies
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 app.use("/auth", authRoutes);
 // ==========================================
 // Routes
@@ -407,5 +408,17 @@ if (require.main === module) {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
 }
+
+// Final error handler: never expose stack traces or file paths
+app.use((err, req, res, next) => {
+  if (err && err.type === "entity.parse.failed") {
+    return res.status(400).json({ error: "Malformed JSON." });
+  }
+  if (err && err.type === "entity.too.large") {
+    return res.status(413).json({ error: "Request body too large." });
+  }
+  console.error("Unhandled error:", err && err.message);
+  return res.status(500).json({ error: "Internal server error." });
+});
 
 module.exports = app;
