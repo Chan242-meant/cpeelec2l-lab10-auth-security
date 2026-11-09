@@ -1,14 +1,20 @@
 require("dotenv/config");
-
+const bcrypt = require("bcryptjs");
 const prisma = require("../src/prisma");
 
 async function main() {
+  const rounds = Number(process.env.BCRYPT_ROUNDS) || 12;
+  const adminHash = await bcrypt.hash("Admin#12345", rounds);
+  const userHash = await bcrypt.hash("User#12345", rounds);
+
   const user1 = await prisma.user.upsert({
     where: { email: "alice@example.com" },
     update: {},
     create: {
       name: "Alice Santos",
       email: "alice@example.com",
+      passwordHash: adminHash,
+      role: "ADMIN",
     },
   });
 
@@ -18,6 +24,8 @@ async function main() {
     create: {
       name: "Bob Reyes",
       email: "bob@example.com",
+      passwordHash: userHash,
+      role: "USER",
     },
   });
 
