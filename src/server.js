@@ -85,7 +85,7 @@ app.get("/tasks", async (req, res) => {
     const tasks = await prisma.task.findMany({
       where,
       include: {
-        user: true,
+        user: { select: { id: true, name: true, email: true } },
       },
       orderBy: {
         id: "asc",
@@ -116,7 +116,7 @@ app.get("/tasks/:id", async (req, res) => {
     const task = await prisma.task.findUnique({
       where: { id },
       include: {
-        user: true,
+        user: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -217,7 +217,7 @@ app.post("/tasks", async (req, res) => {
         userId: parsedUserId,
       },
       include: {
-        user: true,
+        user: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -330,7 +330,7 @@ app.put("/tasks/:id", async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        user: true,
+        user: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -384,8 +384,9 @@ if (isNaN(id)) {
 app.get("/users", async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      orderBy: { id: "asc" },
-    });
+  select: { id: true, name: true, email: true },
+  orderBy: { id: "asc" },
+});
     return res.status(200).json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
