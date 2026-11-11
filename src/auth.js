@@ -61,4 +61,16 @@ async function requireOwnerOrAdmin(req, res, next) {
   }
 }
 
-module.exports = { signToken, authenticate, requireRole, requireOwnerOrAdmin };
+// A USER may not reassign a task to another user; ADMIN may
+function preventReassignment(req, res, next) {
+  const body = req.body || {};
+  if (
+    req.user.role !== "ADMIN" &&
+    body.userId !== undefined &&
+    Number(body.userId) !== req.user.id
+  ) {
+    return res.status(403).json({ error: "Forbidden." });
+  }
+  return next();
+}
+module.exports = { signToken, authenticate, requireRole, requireOwnerOrAdmin, preventReassignment };

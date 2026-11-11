@@ -5,6 +5,7 @@ const express = require("express");
 const cors = require("cors");
 const prisma = require("./prisma");
 const authRoutes = require("./authRoutes");
+const { authenticate, requireRole, requireOwnerOrAdmin, preventReassignment } = require("./auth");
 
 const app = express();
 app.disable("x-powered-by");
@@ -62,7 +63,7 @@ app.get("/health", (req, res) => {
  * GET /tasks
  * Retrieve tasks, optionally filtered by ?status= (TODO, IN_PROGRESS, DONE)
  */
-app.get("/tasks", async (req, res) => {
+app.get("/tasks", authenticate, async (req, res) => {
   try {
     const { status } = req.query;
     const where = {};
@@ -103,7 +104,7 @@ app.get("/tasks", async (req, res) => {
  * GET /tasks/:id
  * Retrieve a single task by ID
  */
-app.get("/tasks/:id", async (req, res) => {
+app.get("/tasks/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
@@ -139,9 +140,14 @@ app.get("/tasks/:id", async (req, res) => {
  * - status: optional, must be a valid enum value (defaults to TODO)
  * - userId: required, user must exist in the database
  */
-app.post("/tasks", async (req, res) => {
+app.post("/tasks", authenticate, async (req, res) => {
   try {
-    const { title, description, status, userId } = req.body;
+    const { title, description, status } = req.body || {};
+    // USER tasks are always assigned to the caller; only ADMIN may choose the assignee
+    const userId =
+      req.user.role === "ADMIN" && (req.body || {}).userId !== undefined
+        ? req.body.userId
+        : req.user.id;
     const errors = [];
 
     // 1. Title validation: required, 1-100 characters
@@ -232,7 +238,7 @@ app.post("/tasks", async (req, res) => {
  * PUT /tasks/:id
  * Update an existing task by ID
  */
-app.put("/tasks/:id", async (req, res) => {
+app.put("/tasks/:id", authenticate, requireOwnerOrAdmin, preventReassignment, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
@@ -345,7 +351,7 @@ app.put("/tasks/:id", async (req, res) => {
  * DELETE /tasks/:id
  * Delete a task by ID
  */
-app.delete("/tasks/:id", async (req, res) => {
+app.delete("/tasks/:id", authenticate, requireRole("ADMIN"), async (req, res) => {
   try {
     const id = /^\d+$/.test(req.params.id) ? parseInt(req.params.id, 10) : NaN;
 if (isNaN(id)) {
@@ -381,7 +387,7 @@ if (isNaN(id)) {
  * Optional helper endpoint: GET /users
  * Handy for frontend user select dropdowns
  */
-app.get("/users", async (req, res) => {
+app.get("/users", authenticate, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
   select: { id: true, name: true, email: true },

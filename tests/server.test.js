@@ -28,8 +28,10 @@ jest.mock("../src/prisma", () => ({
 }));
 
 const request = require("supertest");
+const { signTestToken, authedApi } = require("./helpers");
 const app     = require("../src/server");
 const prisma  = require("../src/prisma");
+const api = authedApi(request, app, signTestToken(1, "ADMIN"));
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -54,7 +56,7 @@ beforeEach(() => jest.clearAllMocks());
 // ---------------------------------------------------------------------------
 describe("GET /health", () => {
   it("returns 200 with status ok and a commit field", async () => {
-    const res = await request(app).get("/health");
+    const res = await api.get("/health");
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ status: "ok" });
     expect(res.body).toHaveProperty("commit");
@@ -66,7 +68,7 @@ describe("GET /health", () => {
 // ---------------------------------------------------------------------------
 describe("GET /", () => {
   it("returns 200 with a running message", async () => {
-    const res = await request(app).get("/");
+    const res = await api.get("/");
     expect(res.statusCode).toBe(200);
     expect(res.body.message).toMatch(/running/i);
   });
@@ -79,7 +81,7 @@ describe("GET /tasks", () => {
   it("returns 200 and an array of tasks", async () => {
     prisma.task.findMany.mockResolvedValue([MOCK_TASK]);
 
-    const res = await request(app).get("/tasks");
+    const res = await api.get("/tasks");
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body[0].id).toBe(1);
@@ -88,7 +90,7 @@ describe("GET /tasks", () => {
   it("filters by valid status query param", async () => {
     prisma.task.findMany.mockResolvedValue([MOCK_TASK]);
 
-    const res = await request(app).get("/tasks?status=TODO");
+    const res = await api.get("/tasks?status=TODO");
     expect(res.statusCode).toBe(200);
     // Confirm findMany was called with the correct where clause
     expect(prisma.task.findMany).toHaveBeenCalledWith(
@@ -97,7 +99,7 @@ describe("GET /tasks", () => {
   });
 
   it("returns 400 for an invalid status query param", async () => {
-    const res = await request(app).get("/tasks?status=INVALID");
+    const res = await api.get("/tasks?status=INVALID");
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toBe("Validation failed");
   });
@@ -110,7 +112,7 @@ describe("GET /tasks/:id", () => {
   it("returns 200 and the task when found", async () => {
     prisma.task.findUnique.mockResolvedValue(MOCK_TASK);
 
-    const res = await request(app).get("/tasks/1");
+    const res = await api.get("/tasks/1");
     expect(res.statusCode).toBe(200);
     expect(res.body.id).toBe(1);
   });
@@ -118,13 +120,13 @@ describe("GET /tasks/:id", () => {
   it("returns 404 when the task does not exist", async () => {
     prisma.task.findUnique.mockResolvedValue(null);
 
-    const res = await request(app).get("/tasks/999");
+    const res = await api.get("/tasks/999");
     expect(res.statusCode).toBe(404);
     expect(res.body.error).toMatch(/not found/i);
   });
 
   it("returns 400 for a non-integer id", async () => {
-    const res = await request(app).get("/tasks/abc");
+    const res = await api.get("/tasks/abc");
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toBe("Validation failed");
   });
@@ -138,7 +140,7 @@ describe("POST /tasks", () => {
     prisma.user.findUnique.mockResolvedValue(MOCK_USER);
     prisma.task.create.mockResolvedValue(MOCK_TASK);
 
-    const res = await request(app)
+    const res = await api
       .post("/tasks")
       .send({ title: "Sample task", userId: 1 });
 
@@ -147,7 +149,7 @@ describe("POST /tasks", () => {
   });
 
   it("returns 400 when title is missing", async () => {
-    const res = await request(app)
+    const res = await api
       .post("/tasks")
       .send({ userId: 1 });
 
@@ -158,7 +160,7 @@ describe("POST /tasks", () => {
   });
 
   it("returns 400 when title exceeds 100 characters", async () => {
-    const res = await request(app)
+    const res = await api
       .post("/tasks")
       .send({ title: "A".repeat(101), userId: 1 });
 
@@ -171,7 +173,7 @@ describe("POST /tasks", () => {
   it("returns 400 when userId does not exist", async () => {
     prisma.user.findUnique.mockResolvedValue(null);
 
-    const res = await request(app)
+    const res = await api
       .post("/tasks")
       .send({ title: "Task", userId: 99 });
 
@@ -184,7 +186,7 @@ describe("POST /tasks", () => {
   it("returns 400 when status is not a valid enum value", async () => {
     prisma.user.findUnique.mockResolvedValue(MOCK_USER);
 
-    const res = await request(app)
+    const res = await api
       .post("/tasks")
       .send({ title: "Task", userId: 1, status: "PENDING" });
 
@@ -205,7 +207,7 @@ describe("PUT /tasks/:id", () => {
     prisma.user.findUnique.mockResolvedValue(MOCK_USER);
     prisma.task.update.mockResolvedValue(updated);
 
-    const res = await request(app)
+    const res = await api
       .put("/tasks/1")
       .send({ title: "Updated title" });
 
@@ -216,7 +218,7 @@ describe("PUT /tasks/:id", () => {
   it("returns 404 when the task does not exist", async () => {
     prisma.task.findUnique.mockResolvedValue(null);
 
-    const res = await request(app)
+    const res = await api
       .put("/tasks/999")
       .send({ title: "x" });
 
@@ -226,7 +228,7 @@ describe("PUT /tasks/:id", () => {
   it("returns 400 when no fields are provided", async () => {
     prisma.task.findUnique.mockResolvedValue(MOCK_TASK);
 
-    const res = await request(app).put("/tasks/1").send({});
+    const res = await api.put("/tasks/1").send({});
     expect(res.statusCode).toBe(400);
   });
 });
@@ -239,7 +241,7 @@ describe("DELETE /tasks/:id", () => {
     prisma.task.findUnique.mockResolvedValue(MOCK_TASK);
     prisma.task.delete.mockResolvedValue(MOCK_TASK);
 
-    const res = await request(app).delete("/tasks/1");
+    const res = await api.delete("/tasks/1");
     expect(res.statusCode).toBe(200);
     expect(res.body.id).toBe(1);
   });
@@ -247,7 +249,7 @@ describe("DELETE /tasks/:id", () => {
   it("returns 404 when the task does not exist", async () => {
     prisma.task.findUnique.mockResolvedValue(null);
 
-    const res = await request(app).delete("/tasks/999");
+    const res = await api.delete("/tasks/999");
     expect(res.statusCode).toBe(404);
   });
 });
@@ -258,7 +260,7 @@ describe("DELETE /tasks/:id - invalid id", () => {
     const invalidId = "abc";
 
     // Act
-    const res = await request(app).delete(`/tasks/${invalidId}`);
+    const res = await api.delete(`/tasks/${invalidId}`);
 
     // Assert
     expect(res.status).toBe(400);
@@ -271,7 +273,7 @@ describe("DELETE /tasks/:id - invalid id", () => {
     const partlyNumericId = "12abc";
 
     // Act
-    const res = await request(app).delete(`/tasks/${partlyNumericId}`);
+    const res = await api.delete(`/tasks/${partlyNumericId}`);
 
     // Assert
     expect(res.status).toBe(400);
@@ -286,7 +288,7 @@ describe("GET /users", () => {
   it("returns 200 and an array of users", async () => {
     prisma.user.findMany.mockResolvedValue([MOCK_USER]);
 
-    const res = await request(app).get("/users");
+    const res = await api.get("/users");
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body[0].name).toBe("Alice Santos");
